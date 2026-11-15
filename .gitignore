@@ -1,0 +1,47 @@
+# user data keep folder, ignore files
+user-data/*
+!user-data/.gitkeep
+
+# node.js and potential dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.eslintcache
+
+# environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# logs and temp files
+*.log
+*.tmp
+*.temp
+
+# Windows clutter
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS clutter
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# linux clutter
+*~
+
+# editor clutter
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
