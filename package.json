@@ -1,0 +1,21 @@
+{
+  "name": "note-taking-thing",
+  "version": "1.0.0",
+  "description": "a thing for taking notes",
+  "homepage": "https://github.com/antun-brajkovic/note-taking-thing#readme",
+  "bugs": {
+    "url": "https://github.com/antun-brajkovic/note-taking-thing/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antun-brajkovic/note-taking-thing.git"
+  },
+  "license": "UNLICENSED",
+  "author": "antun-brajkovic",
+  "type": "module",
+  "main": "server/index.mjs",
+  "scripts": {
+    "start": "node server/index.mjs",
+    "dev": "node --watch server/index.mjs"
+  }
+}
