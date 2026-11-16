@@ -5,6 +5,7 @@ import path from "node:path";
 
 const PROGRAM_ROOT_DIR = import.meta.dirname;
 const CLIENT_DIR = path.resolve(PROGRAM_ROOT_DIR, "../client");
+const USER_DATA_DIR = path.resolve(PROGRAM_ROOT_DIR, "../user-data");
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -14,6 +15,10 @@ const MIME_TYPES = {
   ".jpg": "image/jpeg",
   ".svg": "image/svg+xml",
 };
+const NOTES_URL_SEG = "/notes";
+const NOTES_META_FILE = "notes.json";
+
+let notes = [];
 
 
 http
@@ -42,9 +47,9 @@ http
               response.end();
               return;
             } else {
-              // implement custom dynamic serving here
+              // conditional custom dynamic serving
               
-              // static
+              // static serving
               try {
                 await serveStaticFile(response, filePath);
               } catch(err) {
@@ -52,6 +57,35 @@ http
                 response.statusCode = 500;
                 response.end("Internal Server Error");
               }
+            }
+          } else if(method === "POST") {
+            console.log(`POST: \nurl: ${url}\ncontent: ${body}`);
+            
+            if(url.startsWith(NOTES_URL_SEG)) {
+              console.log("someone's tryna put some notes here oi!");
+              const content = JSON.parse(body);
+              console.log(content);
+              const ind = getNoteInd(content.title);
+              if(ind) {
+                notes[ind].content = content.content;
+                notes[ind].saved = false;
+              } else {
+                notes.push({
+                  title: content.title,
+                  content: content.content,
+                  saved: false
+                });
+              }
+              console.log(`notes:\n${notes}`);
+              await saveNotes();
+
+              response.statusCode = 200;
+              response.end();
+              return;
+            } else {
+              response.statusCode = 500;
+              response.end();
+              return;
             }
           } else {
             response.statusCode = 404;
@@ -67,6 +101,71 @@ http
   })
   .listen(8080);
 
+
+async function saveNotes() {
+  const meta = genMeta();
+
+  writeTextFile(path.join(USER_DATA_DIR, NOTES_META_FILE), JSON.stringify(meta));
+
+  for(let i = 0; i < notes.length; i++) {
+    if(notes[i].saved === false) {
+      writeTextFile(path.join(USER_DATA_DIR, meta[i].fileName), notes[i].content);
+
+      notes[i].saved = true;
+    }
+  }
+}
+
+function genMeta() {
+  let meta = [];
+
+  for(let i = 0; i < notes.length; i++) {
+    meta.push({
+      title: notes[i].title,
+      fileName: hashString(notes[i].title) + ".txt"
+    });
+  }
+
+  return meta;
+}
+
+function hashString(str) { //FNV-1a 32-bit
+  let hash = 0x811c9dc5;
+
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function getNoteInd(title) {
+  for(let i = 0; i < notes.length; i++) {
+    if(notes[i].title === title) {
+      return i;
+    }
+  }
+
+  return false;
+}
+
+async function writeTextFile(filePath, content) {
+  await fs.writeFile(filePath, content, "utf-8");
+  console.log(`written file: ${filePath}\ncontent: \n${content}`);
+}
+
+async function readTextFile(filePath) {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    return content;
+  } catch(err) {
+    if(err.code === "ENOENT") {
+      return null;
+    }
+    throw err; // re-throw unexpected errors
+  }
+}
 
 async function serveStaticFile(response, filePath) {
   if(path.resolve(filePath) === path.resolve(CLIENT_DIR)) {

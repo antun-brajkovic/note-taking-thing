@@ -1,11 +1,18 @@
 const noteListDiv = document.getElementById("note-list-div");
 const newNoteBtn = document.getElementById("new-note-btn");
 const delNoteBtn = document.getElementById("del-note-btn");
-const activeNoteSpan = document.getElementById("active-note-div");
-
+const activeNoteDiv = document.getElementById("active-note-div");
+const thisUrl = window.location.origin + window.location.pathname.replace(/\/+$/, "") + "/";
+const noteUrlPart = "notes/";
+//console.log(thisUrl)
 const noteMap = new Map();
+const lastNoteActivityAutosaveInterval = 5000; //ms
 
 let activeNote = null;
+let activeNoteInteracted = false;
+let activeNoteSaved = false;
+let activeNoteInteractTime = 0;
+let activeNoteSaveTime = 0;
 
 
 class Note {
@@ -16,10 +23,50 @@ class Note {
 }
 
 
-function selectNote(title) {
+async function saveActiveNoteToServer() {
+  if(activeNote === null) return;
+
+  try {
+    const response = await fetch(thisUrl + noteUrlPart, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: activeNote,
+        content: noteMap.get(activeNote)
+      })
+    });
+
+    if(!response.ok) {
+      console.error(`Response status: ${response.status}`);
+    } else {
+      activeNoteSaved = true;
+      activeNoteSaveTime = Date.now();
+    }
+  } catch(err) {
+    console.error(err);
+  }
+}
+
+function setActiveNote(title) {
   activeNote = title;
+  //activeNoteInteracted = false;
+  // possibility of last active note to not have been saved, could be solved by having a "save list"
+}
+
+async function selectNote(title) {  
+  if(activeNoteInteracted) {
+    if(!activeNoteSaved) {
+      await saveActiveNoteToServer();
+    }
+  }
+
+  if(activeNote !== title) {
+    setActiveNote(title);
   
-  regenUI();
+    regenUI();
+  }
 }
 
 function regenUINoteList() {
@@ -30,8 +77,8 @@ function regenUINoteList() {
     if(activeNote === title) btn.style = "font-weight: bold;";
     
     btn.textContent = title;
-    btn.onclick = function() {
-      selectNote(title);
+    btn.onclick = async function() {
+      await selectNote(title);
     }
     noteListDiv.appendChild(btn);
   }
@@ -39,15 +86,20 @@ function regenUINoteList() {
 
 function regenUIActiveNote() {
   if(activeNote === null) {
-    activeNoteSpan.innerHTML = "no note selected";
-    activeNoteSpan.contentEditable = false;
+    activeNoteDiv.innerHTML = "no note selected";
+    activeNoteDiv.contentEditable = false;
   } else {
     if(noteMap.get(activeNote) === null || noteMap.get(activeNote) === "") noteMap.set(activeNote, "your note...");
 
-    activeNoteSpan.innerHTML = noteMap.get(activeNote);
-    activeNoteSpan.contentEditable = true;
-    activeNoteSpan.oninput = function() {
-      if(activeNote !== null) noteMap.set(activeNote, activeNoteSpan.innerHTML);
+    activeNoteDiv.innerHTML = noteMap.get(activeNote);
+    activeNoteDiv.contentEditable = true;
+    activeNoteDiv.oninput = function() {
+      if(activeNote !== null) {
+        noteMap.set(activeNote, activeNoteDiv.innerHTML);
+        activeNoteInteracted = true;
+        activeNoteSaved = false;
+        activeNoteInteractTime = Date.now();
+      }
     }
   }
 }
@@ -57,10 +109,20 @@ function regenUI() {
   regenUIActiveNote();
 }
 
-function addNewNote(title, content) {
-  noteMap.set(title, content);
-  activeNote = title;
+async function addNewNote(title, content) {
+  if(noteMap.has(title)) return;
   
+  if(activeNoteInteracted) {
+    if(!activeNoteSaved) {
+      await saveActiveNoteToServer();
+    }
+  }
+
+  noteMap.set(title, content);
+  setActiveNote(title);
+  
+  await saveActiveNoteToServer();
+
   regenUI();
 }
 
@@ -76,20 +138,21 @@ function removeActiveNote() {
   }
   
   noteMap.delete(activeNote);
-  activeNote = tmpNoteBeforeActive;
+  setActiveNote(tmpNoteBeforeActive);
 
   regenUI();
 }
 
 
-newNoteBtn.onclick = function() {
+newNoteBtn.onclick = async function() {
   let title = prompt("Enter the title of the new note", "");
   if(title === null || title.trim() === "") return;
   
   while(noteMap.has(title)) {
     title += "-1";
   }
-  addNewNote(title, "");
+
+  await addNewNote(title, "");
 };
 
 delNoteBtn.onclick = function() {
