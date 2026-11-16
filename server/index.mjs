@@ -23,7 +23,7 @@ let notes = [];
 
 http
   .createServer(async (request, response) => {
-    if(request.method === "GET" || request.method === "POST") {
+    if(request.method === "GET" || request.method === "POST" || request.method === "DELETE") {
       const { headers, method, url } = request;
       let body = [];
       request
@@ -66,7 +66,7 @@ http
               const content = JSON.parse(body);
               console.log(content);
               const ind = getNoteInd(content.title);
-              if(ind) {
+              if(ind !== false) {
                 notes[ind].content = content.content;
                 notes[ind].saved = false;
               } else {
@@ -80,6 +80,22 @@ http
               await saveNotes();
 
               response.statusCode = 200;
+              response.end();
+              return;
+            } else {
+              response.statusCode = 500;
+              response.end();
+              return;
+            }
+          } else if(method === "DELETE") {
+            console.log(`DELETE: title: ${headers["note-title"]}`);
+
+            if(url.startsWith(NOTES_URL_SEG)) {
+              console.log("deletenzi bitte :pray:");
+              await removeNote(headers["note-title"]);
+              await saveNotes();
+            
+              response.statusCode = 204;
               response.end();
               return;
             } else {
@@ -102,14 +118,19 @@ http
   .listen(8080);
 
 
-async function saveNotes() {
+async function removeNote(title) {
+  await deleteFile(path.join(USER_DATA_DIR, hashString(notes[getNoteInd(title)].title) + ".txt"));
+  notes.splice(getNoteInd(title), 1);
+}
+
+async function saveNotes() { // maybe make saving atomic on a per-note basis?
   const meta = genMeta();
 
-  writeTextFile(path.join(USER_DATA_DIR, NOTES_META_FILE), JSON.stringify(meta));
+  await writeTextFile(path.join(USER_DATA_DIR, NOTES_META_FILE), JSON.stringify(meta));
 
   for(let i = 0; i < notes.length; i++) {
     if(notes[i].saved === false) {
-      writeTextFile(path.join(USER_DATA_DIR, meta[i].fileName), notes[i].content);
+      await writeTextFile(path.join(USER_DATA_DIR, meta[i].fileName), notes[i].content);
 
       notes[i].saved = true;
     }
@@ -165,6 +186,10 @@ async function readTextFile(filePath) {
     }
     throw err; // re-throw unexpected errors
   }
+}
+
+async function deleteFile(filePath) {
+  await fs.rm(filePath, { force: true });
 }
 
 async function serveStaticFile(response, filePath) {

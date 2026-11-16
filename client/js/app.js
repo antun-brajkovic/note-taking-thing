@@ -49,6 +49,29 @@ async function saveActiveNoteToServer() {
   }
 }
 
+async function deleteActiveNoteOnServer() {
+  if(activeNote === null) return;
+
+  try {
+    const response = await fetch(thisUrl + noteUrlPart, {
+      method: "DELETE",
+      headers: {
+        "Note-Title": activeNote
+      }
+    });
+
+    if(!response.ok) {
+      console.error(`Response status: ${response.status}`);
+      return false;
+    } else {
+      return true;
+    }
+  } catch(err) {
+    console.error(err);
+    return false;
+  }
+}
+
 function setActiveNote(title) {
   activeNote = title;
   //activeNoteInteracted = false;
@@ -126,21 +149,23 @@ async function addNewNote(title, content) {
   regenUI();
 }
 
-function removeActiveNote() { 
-  // get the note before the one being currently deleted and select it after deletion
-  let tmpActiveNote = null;
-  let tmpNoteBeforeActive = null;
-  for(const [title, content] of noteMap) {
-    tmpNoteBeforeActive = tmpActiveNote;
-    tmpActiveNote = title;
-      
-    if(tmpActiveNote === activeNote) break;
-  }
+async function removeActiveNote() {
+  if(await deleteActiveNoteOnServer()) {
+    // get the note before the one being currently deleted and select it after deletion
+    let tmpActiveNote = null;
+    let tmpNoteBeforeActive = null;
+    for(const [title, content] of noteMap) {
+      tmpNoteBeforeActive = tmpActiveNote;
+      tmpActiveNote = title;
+        
+      if(tmpActiveNote === activeNote) break;
+    }
+    
+    noteMap.delete(activeNote);
+    setActiveNote(tmpNoteBeforeActive);
   
-  noteMap.delete(activeNote);
-  setActiveNote(tmpNoteBeforeActive);
-
-  regenUI();
+    regenUI();
+  }
 }
 
 
@@ -155,10 +180,10 @@ newNoteBtn.onclick = async function() {
   await addNewNote(title, "");
 };
 
-delNoteBtn.onclick = function() {
+delNoteBtn.onclick = async function() {
   if(activeNote === null) return;
   
   if(confirm(`Delete note "${activeNote}"?`)) {
-    removeActiveNote();
+    await removeActiveNote();
   }
 }
