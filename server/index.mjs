@@ -41,94 +41,104 @@ http
           body.push(chunk);
         })
         .on("end", async () => {
-          body = Buffer.concat(body).toString();
-
-          response.on("error", err => {
-            console.error(err);
-          });
-          
-          if(method === "GET") {
-            let filePath = path.join(CLIENT_DIR, url);
-            if(!filePath.startsWith(path.resolve(CLIENT_DIR) + path.sep)) {
-              response.statusCode = 404;
-              response.end();
-              return;
-            } else {
-              // conditional custom dynamic serving
-              if(url.startsWith(NOTES_URL_SEG)) {
+          try {
+            body = Buffer.concat(body).toString();
+  
+            response.on("error", err => {
+              console.error(err);
+            });
+            
+            if(method === "GET") {
+              let filePath = path.join(CLIENT_DIR, url);
+              if(!filePath.startsWith(path.resolve(CLIENT_DIR) + path.sep)) {
+                response.statusCode = 404;
+                response.end();
+                return;
+              } else {
+                // conditional custom dynamic serving
+                if(url.startsWith(NOTES_URL_SEG)) {
+                  try {
+                    await serveNotes(response);
+                  } catch(err) {
+                    console.error(err);
+                    response.statusCode = 500;
+                    response.end("Internal Server Error");
+                  }
+  
+                  return;
+                }
+                
+                // static serving
                 try {
-                  await serveNotes(response);
+                  await serveStaticFile(response, filePath);
                 } catch(err) {
                   console.error(err);
                   response.statusCode = 500;
                   response.end("Internal Server Error");
                 }
-
-                return;
               }
+            } else if(method === "POST") {
+              console.log(`POST: \nurl: ${url}\ncontent: ${body}`);
               
-              // static serving
-              try {
-                await serveStaticFile(response, filePath);
-              } catch(err) {
-                console.error(err);
-                response.statusCode = 500;
-                response.end("Internal Server Error");
-              }
-            }
-          } else if(method === "POST") {
-            console.log(`POST: \nurl: ${url}\ncontent: ${body}`);
-            
-            if(url.startsWith(NOTES_URL_SEG)) {
-              console.log("someone's tryna put some notes here oi!");
-              const content = JSON.parse(body);
-              console.log(content);
-              const ind = getNoteInd(content.title);
-              if(ind !== false) {
-                notes[ind].content = content.content;
-                notes[ind].saved = false;
-              } else {
-                notes.push({
-                  title: content.title,
-                  content: content.content,
-                  saved: false
-                });
-              }
-              console.log(`notes:\n${notes}`);
-              await saveNotes();
-
-              response.statusCode = 200;
-              response.end();
-              return;
-            } else {
-              response.statusCode = 500;
-              response.end();
-              return;
-            }
-          } else if(method === "DELETE") {
-            console.log(`DELETE: title: ${headers["note-title"]}`);
-
-            if(url.startsWith(NOTES_URL_SEG)) {
-              console.log("deletenzi bitte :pray:");
-              if(await removeNote(headers["note-title"])) {
+              if(url.startsWith(NOTES_URL_SEG)) {
+                console.log("someone's tryna put some notes here oi!");
+                const content = JSON.parse(body);
+                console.log(content);
+                const ind = getNoteInd(content.title);
+                if(ind !== false) {
+                  notes[ind].content = content.content;
+                  notes[ind].saved = false;
+                } else {
+                  notes.push({
+                    title: content.title,
+                    content: content.content,
+                    saved: false
+                  });
+                }
+                console.log(`notes:\n${notes}`);
                 await saveNotes();
-              
-                response.statusCode = 204;
+  
+                response.statusCode = 200;
                 response.end();
                 return;
               } else {
                 response.statusCode = 500;
                 response.end();
+                return;
+              }
+            } else if(method === "DELETE") {
+              console.log(`DELETE: title: ${headers["note-title"]}`);
+  
+              if(url.startsWith(NOTES_URL_SEG)) {
+                console.log("deletenzi bitte :pray:");
+                if(await removeNote(headers["note-title"])) {
+                  await saveNotes();
+                
+                  response.statusCode = 204;
+                  response.end();
+                  return;
+                } else {
+                  response.statusCode = 500;
+                  response.end();
+                }
+              } else {
+                response.statusCode = 500;
+                response.end();
+                return;
               }
             } else {
-              response.statusCode = 500;
+              response.statusCode = 404;
               response.end();
               return;
             }
-          } else {
-            response.statusCode = 404;
-            response.end();
-            return;
+  
+          } catch(err) {
+            console.error(err);
+
+            if(!response.headersSent) {
+              response.statusCode = 500;
+              response.end("Internal Server Error");
+            }
           }
       });
     } else {
