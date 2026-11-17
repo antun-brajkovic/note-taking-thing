@@ -110,12 +110,16 @@ http
 
             if(url.startsWith(NOTES_URL_SEG)) {
               console.log("deletenzi bitte :pray:");
-              await removeNote(headers["note-title"]);
-              await saveNotes();
-            
-              response.statusCode = 204;
-              response.end();
-              return;
+              if(await removeNote(headers["note-title"])) {
+                await saveNotes();
+              
+                response.statusCode = 204;
+                response.end();
+                return;
+              } else {
+                response.statusCode = 500;
+                response.end();
+              }
             } else {
               response.statusCode = 500;
               response.end();
@@ -168,8 +172,13 @@ async function loadNotes() {
 }
 
 async function removeNote(title) {
-  await deleteFile(path.join(USER_DATA_DIR, hashString(notes[getNoteInd(title)].title) + ".txt"));
-  notes.splice(getNoteInd(title), 1);
+  const ind = getNoteInd(title);
+
+  if(ind === false) return false;
+
+  await deleteFile(path.join(USER_DATA_DIR, hashString(notes[ind].title) + ".txt"));
+  notes.splice(ind, 1);
+  return true;
 }
 
 async function saveNotes() { // maybe make saving atomic on a per-note basis?
