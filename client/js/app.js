@@ -15,6 +15,25 @@ let activeNoteInteractTime = 0;
 let activeNoteSaveTime = 0;
 
 
+async function fetchAllNotesFromServer() { // terrible long-term solution
+  try {
+    const response = await fetch(thisUrl + noteUrlPart, { method: "GET" });
+
+    if(!response.ok) {
+      console.error(`Response status: ${response.status}`);
+    } else {
+      const rawText = await response.text();
+      const rawNotes = JSON.parse(rawText);
+      
+      for(let i = 0; i < rawNotes.length; i++) {
+        noteMap.set(rawNotes[i].title, rawNotes[i].content);
+      }
+    }
+  } catch(err) {
+    console.error(err);
+  }
+}
+
 async function saveActiveNoteToServer() {
   if(activeNote === null) return;
 
@@ -179,3 +198,11 @@ delNoteBtn.onclick = async function() {
     await removeActiveNote();
   }
 }
+
+
+async function initApp() {
+  await fetchAllNotesFromServer();
+  regenUI();
+}
+
+await initApp();

@@ -21,6 +21,13 @@ const NOTES_META_FILE = "notes.json";
 let notes = [];
 
 
+async function initServer() {
+  await loadNotes();
+}
+
+
+await initServer();
+
 http
   .createServer(async (request, response) => {
     if(request.method === "GET" || request.method === "POST" || request.method === "DELETE") {
@@ -48,6 +55,17 @@ http
               return;
             } else {
               // conditional custom dynamic serving
+              if(url.startsWith(NOTES_URL_SEG)) {
+                try {
+                  await serveNotes(response);
+                } catch(err) {
+                  console.error(err);
+                  response.statusCode = 500;
+                  response.end("Internal Server Error");
+                }
+
+                return;
+              }
               
               // static serving
               try {
@@ -117,6 +135,37 @@ http
   })
   .listen(8080);
 
+
+async function serveNotes(response) {
+  let retVal = [];
+
+  for(let i = 0; i < notes.length; i++) { // maybe separate the note data so that you can directly serve it without parsing and have other data the server uses be in a separate array? but that might only be a performance improvement...
+    retVal.push({
+      title: notes[i].title,
+      content: notes[i].content
+    });
+  }
+
+  response.statusCode = 200;
+  response.end(JSON.stringify(retVal));
+}
+
+async function loadNotes() {
+  const metaText = await readTextFile(path.join(USER_DATA_DIR, NOTES_META_FILE));
+
+  if(metaText !== null) {
+    const meta = JSON.parse(metaText);
+
+    for(let i = 0; i < meta.length; i++) {
+      const textFileCont = await readTextFile(path.join(USER_DATA_DIR, meta[i].fileName));
+      notes.push({
+        title: meta[i].title,
+        content: (textFileCont !== null) ? textFileCont : "",
+        saved: true
+      });
+    }
+  }
+}
 
 async function removeNote(title) {
   await deleteFile(path.join(USER_DATA_DIR, hashString(notes[getNoteInd(title)].title) + ".txt"));
