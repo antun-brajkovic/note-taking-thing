@@ -15,14 +15,6 @@ let activeNoteInteractTime = 0;
 let activeNoteSaveTime = 0;
 
 
-class Note {
-  constructor(title, content) {
-    this.title = title;
-    this.content = content;
-  }
-}
-
-
 async function saveActiveNoteToServer() {
   if(activeNote === null) return;
 
